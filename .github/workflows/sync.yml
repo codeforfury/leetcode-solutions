@@ -1,0 +1,55 @@
+name: Sync LeetCode Submissions
+
+on:
+  repository_dispatch:
+    types: [leetcode_submission]   # fired instantly by the Tampermonkey script
+  schedule:
+    # Safety-net run, in case the browser trigger ever misses a submission
+    # (e.g. script disabled, laptop closed mid-request). Adjust as you like.
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run sync script
+        id: sync
+        env:
+          LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
+          LEETCODE_CSRFTOKEN: ${{ secrets.LEETCODE_CSRFTOKEN }}
+        run: python scripts/sync_leetcode.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "codeforfury"
+          git config user.email "dasrajiv6507@gmail.com"
+          git add dsa sql README.md
+          git diff --cached --quiet && echo "No changes to commit." && exit 0
+          git commit -m "chore: sync new LeetCode submissions [skip ci]"
+
+          # Two problems solved seconds apart can trigger overlapping runs.
+          # Retry a few times: pull the latest commits, rebase ours on top,
+          # then push. This lets near-simultaneous runs queue up safely
+          # instead of failing outright.
+          for i in 1 2 3 4 5; do
+            git pull --rebase --autostash && git push && break
+            echo "Push attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
