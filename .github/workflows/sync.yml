@@ -40,7 +40,7 @@ jobs:
         run: |
           git config user.name "codeforfury"
           git config user.email "dasrajiv6507@gmail.com"
-          git add dsa sql README.md
+          git add -A
           git diff --cached --quiet && echo "No changes to commit." && exit 0
           git commit -m "chore: sync new LeetCode submissions [skip ci]"
 
